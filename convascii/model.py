@@ -3,29 +3,28 @@ from tqdm import tqdm
 import numpy as np
 from keras import backend as K
 from keras.models import Model
-from keras.layers import Conv2D, MaxPool2D, BatchNormalization, Lambda, Layer
+from keras.layers import Conv2D, MaxPool2D, AvgPool2D, BatchNormalization, Lambda, Layer
 from keras.applications.vgg16 import VGG16, preprocess_input
 from keras.preprocessing.image import img_to_array, array_to_img
 from PIL import Image, ImageDraw, ImageFont
 
 vocab = string.ascii_uppercase + string.digits + " \\[]!@#$%^&*()_+=-:;.~|"
 
-def make_model(features, layer_name="block2_conv1"):
+def make_model(features, layer_name="block2_conv1", pooling=None):
     vgg = VGG16(include_top=False)
     layer = vgg.get_layer(layer_name)
     x = layer.output
     num_chars, char_w, char_h, char_filters = features.shape
-    filters = features.transpose((1, 2, 3, 0)).astype(int)
-    filters = filters / np.sqrt(np.sum(np.square(filters), axis=(0, 1), keepdims=True))
+    fil_or = 1
+    filters = features.transpose((1, 2, 3, 0)).astype(np.float32)[::fil_or, ::fil_or, ...]
+    filter_norm = np.sqrt(np.sum(np.square(filters), axis=(0, 1), keepdims=True))
     x = BatchNormalization()(x)
-    #log_op = lambda inp: K.tf.py_func(log, [inp], K.tf.float32)
-    #log_op = lambda inp: K.tf.Print(inp, [inp])
-    #x = Lambda(log_op)(x)
     specialized_layer = Conv2D(num_chars, (char_w, char_h))
     x = specialized_layer(x)
     biases = np.zeros((num_chars, ))
     specialized_layer.set_weights([filters, biases])
-    #x = MaxPool2D()(x)
+    if pooling:
+        x = AvgPool2D()(x)
     model = Model(inputs=vgg.input, outputs=x)
     return model
 
